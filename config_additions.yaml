@@ -1,0 +1,37 @@
+# =============================================================================
+# config.yaml 에 추가할 설정 블록
+# =============================================================================
+# 기존 html_report 섹션을 아래 내용으로 교체하세요.
+# =============================================================================
+
+html_report:
+  enabled: true
+  out_dir: "site"
+
+  # [방법 A] 로컬 PC 용 live HTML 생성에 필요합니다.
+  # raw.githubusercontent.com 의 site/ 폴더 경로를 입력하세요.
+  # 형식: https://raw.githubusercontent.com/<유저명>/<repo명>/main/site
+  # repo 가 Private 이면 PAT(Personal Access Token) 을 URL 에 포함할 수 없습니다.
+  # 그 경우 GitHub Pages 를 켜거나, repo 를 Public 으로 설정하세요.
+  github_raw_base: "https://raw.githubusercontent.com/yourname/eu-reg-watch/main/site"
+
+  # 보고서 상단에 표시할 제목 (선택)
+  # site_title: "ACME EU Regulatory Early-Warning"
+
+
+# =============================================================================
+# GitHub Secrets 에 추가할 항목 (방법 B - 이메일 발송 시)
+# =============================================================================
+#
+# | Secret 이름        | 값                                          |
+# |--------------------|---------------------------------------------|
+# | SENDGRID_API_KEY   | SendGrid 에서 발급한 API 키 (SG.xxx...)     |
+# | MAIL_TO            | 수신자 이메일 (쉼표로 여러 명 가능)         |
+# |                    | 예: user1@company.com,user2@company.com     |
+# | MAIL_FROM          | SendGrid 에서 인증한 발신 주소              |
+# |                    | 예: eu-watch@yourcompany.com               |
+#
+# SendGrid 가입: https://sendgrid.com (무료 플랜: 월 100건, 일 충분)
+# API 키 발급: Settings → API Keys → Create API Key → Mail Send 권한만 체크
+# 발신 주소 인증: Settings → Sender Authentication
+# =============================================================================

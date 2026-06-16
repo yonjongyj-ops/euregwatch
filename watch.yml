@@ -1,0 +1,170 @@
+name: EU Reg Watch
+
+on:
+  schedule:
+    - cron: "0 7 * * *"
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+
+concurrency:
+  group: eu-reg-watch
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Get the code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests pyyaml feedparser
+
+      - name: Run the monitor
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          SLACK_WEBHOOK:     ${{ secrets.SLACK_WEBHOOK }}
+          TEAMS_WEBHOOK:     ${{ secrets.TEAMS_WEBHOOK }}
+        run: |
+          python - <<'PY'
+          import os, yaml
+          c = yaml.safe_load(open("config.yaml"))
+          c.setdefault("notify", {})
+          if os.environ.get("SLACK_WEBHOOK"):
+              c["notify"]["slack_webhook"] = os.environ["SLACK_WEBHOOK"]
+          if os.environ.get("TEAMS_WEBHOOK"):
+              c["notify"]["teams_webhook"] = os.environ["TEAMS_WEBHOOK"]
+          yaml.safe_dump(c, open("config.yaml", "w"))
+          PY
+          python eu_reg_watch.py --lookback-days 3
+
+      # -----------------------------------------------------------------------
+      # 방법 A: alerts.json 을 site/ 에 추가 (local_client.html 이 fetch 해감)
+      # html_report_patch.py 를 사용합니다.
+      # -----------------------------------------------------------------------
+      - name: Export alerts JSON (방법 A 용)
+        run: |
+          python - <<'PY'
+          import yaml, sys
+          sys.path.insert(0, ".")
+          from html_report_patch import export_json, render_local_client
+          from html_report import render_site
+          import sqlite3, json
+
+          cfg = yaml.safe_load(open("config.yaml"))
+          hr  = cfg.get("html_report", {})
+          out_dir = hr.get("out_dir", "site")
+
+          # 마지막 실행의 relevant alerts 를 DB 에서 복원
+          conn = sqlite3.connect(cfg.get("db_path", "seen.sqlite"))
+          rows = conn.execute(
+              "SELECT uid, source, first_seen, relevance, tier, posted FROM seen "
+              "WHERE posted=1 ORDER BY first_seen DESC LIMIT 200"
+          ).fetchall()
+          conn.close()
+
+          # Act-like 간이 객체
+          class A:
+              pass
+
+          alerts = []
+          for uid, source, first_seen, relevance, tier, posted in rows:
+              a = A()
+              a.uid, a.source, a.date = uid, source, (first_seen or "")[:10]
+              a.relevance, a.tier = relevance, tier
+              # 나머지 필드는 DB 에 없으므로 빈값 처리
+              a.title = uid
+              a.url   = ""
+              a.summary = ""
+              a.product_line = ""
+              a.stage = ""
+              a.topics = ""
+              a.owner = ""
+              a.extra = {}
+              alerts.append(a)
+
+          # JSON 내보내기
+          export_json(alerts, out_dir)
+
+          # local_client.html 최초 생성 (github_raw_base 가 설정된 경우)
+          raw_base = hr.get("github_raw_base", "")
+          if raw_base:
+              render_local_client(out_dir, raw_base)
+          PY
+
+      # -----------------------------------------------------------------------
+      # 방법 B: 최신 index.html 을 이메일로 발송
+      # GitHub Secret 에 MAIL_TO / SENDGRID_API_KEY 를 추가해야 합니다.
+      # SendGrid 무료 플랜(월 100건)으로 충분합니다.
+      # -----------------------------------------------------------------------
+      - name: Send HTML report by email (방법 B 용)
+        # SENDGRID_API_KEY Secret 이 없으면 이 단계를 건너뜁니다.
+        if: ${{ secrets.SENDGRID_API_KEY != '' }}
+        env:
+          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
+          MAIL_TO:          ${{ secrets.MAIL_TO }}
+          MAIL_FROM:        ${{ secrets.MAIL_FROM }}   # SendGrid 에서 인증한 발신 주소
+        run: |
+          pip install sendgrid -q
+          python - <<'PY'
+          import os, base64
+          from sendgrid import SendGridAPIClient
+          from sendgrid.helpers.mail import (
+              Mail, Attachment, FileContent, FileName, FileType, Disposition
+          )
+
+          html_path = "site/index.html"
+          if not os.path.exists(html_path):
+              print("[skip] site/index.html 없음 — 이메일 발송 건너뜀")
+              exit(0)
+
+          with open(html_path, "rb") as f:
+              encoded = base64.b64encode(f.read()).decode()
+
+          message = Mail(
+              from_email=os.environ["MAIL_FROM"],
+              to_emails=os.environ["MAIL_TO"].split(","),  # 쉼표로 여러 명 가능
+              subject="EU Reg Watch — 오늘의 규제 동향 보고서",
+              html_content=(
+                  "<p>안녕하세요,</p>"
+                  "<p>오늘의 EU 규제 조기경보 보고서를 첨부합니다.<br>"
+                  "첨부 파일을 브라우저로 열어 확인하세요.</p>"
+                  "<p>— EU Reg Watch 자동발송</p>"
+              ),
+          )
+          attachment = Attachment(
+              FileContent(encoded),
+              FileName("eu-reg-watch.html"),
+              FileType("text/html"),
+              Disposition("attachment"),
+          )
+          message.attachment = attachment
+
+          sg = SendGridAPIClient(os.environ["SENDGRID_API_KEY"])
+          response = sg.send(message)
+          print(f"[info] 이메일 발송 완료: status {response.status_code}")
+          print(f"[info] 수신자: {os.environ['MAIL_TO']}")
+          PY
+
+      # -----------------------------------------------------------------------
+      # dedup DB + site/ 폴더 커밋 (방법 A 의 JSON 포함)
+      # -----------------------------------------------------------------------
+      - name: Persist dedup store and site/
+        run: |
+          git config user.name  "eu-reg-watch-bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add -A seen.sqlite site
+          if git diff --cached --quiet; then
+            echo "Nothing to commit."
+          else
+            git commit -m "Update dedup store + site/ [skip ci]"
+            git push
+          fi

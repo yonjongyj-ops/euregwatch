@@ -1,0 +1,177 @@
+# EU Regulatory Early-Warning Monitor - configuration
+# Tailored for a multinational tech / consumer-electronics company,
+# organised by PRODUCT LINE (device-based) plus cross-cutting domains.
+# Copy to config.yaml and adjust. Secrets (ANTHROPIC_API_KEY, webhooks) go in
+# the environment / GitHub Secrets, NOT in this file.
+
+contact_email: "compliance@yourcompany.eu"
+db_path: "seen.sqlite"
+model: "claude-sonnet-4-6"
+
+relevance_threshold: 60      # post only items scoring >= this AND matching a topic
+query_limit: 400             # CELLAR rows per poll (stay under the 10k search cap)
+hys_page_size: 50            # Have Your Say records per poll
+score_delay_seconds: 0.5     # pacing between Anthropic calls
+
+company_profile: >
+  A multinational technology and consumer-electronics company that designs,
+  manufactures and sells: mobile phones; electronic displays (televisions and
+  computer monitors / digital signage); digital home appliances (refrigerators,
+  washing machines, dishwashers and similar); telecommunication network devices
+  (base stations, routers, customer-premises and network equipment); and medical
+  devices (including software/AI as a medical device), plus companion software
+  and cloud services, into the EU single market. Its products are radio/wireless
+  devices, contain batteries and digital elements, process EU residents' personal
+  data, and use AI/ML features in some products. Its connected devices (smart TVs,
+  phones) also surface audiovisual and media-content services subject to EU media
+  rules.
+
+# --- Watchlist organised BY PRODUCT LINE ------------------------------------
+# DEVICE lines carry the device-specific frameworks and all route to Hardware
+# regulatory. CROSS-CUTTING lines (data/AI, security) catch items that are
+# primarily about those domains regardless of device, and route to the
+# specialist team. The scorer picks the single best-matching line per item.
+product_lines:
+
+  mobile_phones:
+    label: "Mobile phones"
+    owner: "Regulatory"
+    frameworks:
+      - "Radio Equipment Directive (RED) 2014/53/EU and delegated/implementing acts"
+      - "Common charger / USB-C requirement (RED amendment 2022/2380)"
+      - "Smartphone & tablet Ecodesign Regulation (EU) 2023/1670 (durability, repairability)"
+      - "Smartphone & tablet Energy Labelling Regulation (EU) 2023/1669"
+      - "Batteries Regulation (EU) 2023/1542 (portable/removable battery, labelling)"
+      - "EMC Directive 2014/30/EU; Low Voltage Directive 2014/35/EU"
+      - "General Product Safety Regulation (GPSR) 2023/988"
+      - "ESPR 2024/1781 and Digital Product Passport as it extends to phones"
+      - "WEEE 2012/19/EU; RoHS 2011/65/EU; REACH"
+      - "CE marking, harmonised standards, market surveillance"
+
+  visual_displays:
+    label: "Visual displays (TVs, monitors, digital signage)"
+    owner: "Regulatory"
+    frameworks:
+      - "Electronic Displays Ecodesign Regulation (EU) 2019/2021 (TVs, monitors, signage)"
+      - "Electronic Displays Energy Labelling Delegated Reg (EU) 2019/2013"
+      - "Ongoing electronic-displays ecodesign/labelling review (durability, repairability, recyclability)"
+      - "ESPR 2024/1781 and Digital Product Passport for displays"
+      - "Standby / networked-standby Ecodesign Regulation (EU) 2023/826"
+      - "EMC Directive 2014/30/EU; Low Voltage Directive 2014/35/EU"
+      - "RED 2014/53/EU where the display has wireless connectivity (smart TVs)"
+      - "General Product Safety Regulation (GPSR) 2023/988"
+      - "WEEE 2012/19/EU; RoHS 2011/65/EU; REACH"
+      - "CE marking, harmonised standards, market surveillance"
+
+  digital_appliances:
+    label: "Digital appliances (fridges, washers, dishwashers)"
+    owner: "Regulatory"
+    frameworks:
+      - "Refrigerating appliances Ecodesign Reg (EU) 2019/2019 + Energy Label (EU) 2019/2016"
+      - "Household washing machines/washer-dryers Ecodesign (EU) 2019/2023 + Energy Label (EU) 2019/2014"
+      - "Household dishwashers Ecodesign (EU) 2019/2022 + Energy Label (EU) 2019/2017"
+      - "Tumble dryers Energy Labelling Delegated Reg (EU) 2023/2534"
+      - "Standby / networked-standby Ecodesign Regulation (EU) 2023/826"
+      - "ESPR 2024/1781 and Digital Product Passport for appliances"
+      - "Right to repair / repairability and spare-parts availability"
+      - "EMC Directive 2014/30/EU; Low Voltage Directive 2014/35/EU"
+      - "RED 2014/53/EU where the appliance is connected (smart appliances)"
+      - "General Product Safety Regulation (GPSR) 2023/988"
+      - "WEEE 2012/19/EU; RoHS 2011/65/EU; REACH"
+      - "CE marking, harmonised standards, market surveillance"
+
+  network_devices:
+    label: "Network devices"
+    owner: "Regulatory"
+    frameworks:
+      - "Radio Equipment Directive (RED) 2014/53/EU (spectrum, base stations, CPE, routers)"
+      - "EMC Directive 2014/30/EU; Low Voltage Directive 2014/35/EU"
+      - "European Electronic Communications Code (EECC) Directive (EU) 2018/1972"
+      - "BEREC guidelines and decisions"
+      - "Radio Spectrum Policy / harmonised spectrum decisions"
+      - "Cyber Resilience Act (CRA) for network products with digital elements"
+      - "NIS2 Directive (EU) 2022/2555 (network infrastructure / essential entities)"
+      - "5G security toolbox and supply-chain security measures"
+      - "Standby / networked-standby Ecodesign Regulation (EU) 2023/826"
+      - "ESPR 2024/1781 and Digital Product Passport where applicable"
+      - "EMF / human-exposure limits for radio equipment"
+      - "WEEE 2012/19/EU; RoHS 2011/65/EU; REACH"
+      - "CE marking, harmonised standards, market surveillance"
+
+  medical_devices:
+    label: "Medical devices"
+    owner: "Medical"
+    frameworks:
+      - "Medical Device Regulation (MDR) (EU) 2017/745"
+      - "In Vitro Diagnostic Regulation (IVDR) (EU) 2017/746"
+      - "EUDAMED database and UDI registration (mandatory use from 28 May 2026)"
+      - "MDR/IVDR transitional provisions (Reg (EU) 2023/607, 2024/1860)"
+      - "MDR/IVDR simplification proposal (2026) and amendments"
+      - "Software as a Medical Device (SaMD) and AI Act interplay (MDCG 2025-6)"
+      - "MDCG guidance documents (classification, clinical evaluation, PMS)"
+      - "Notified Body conformity assessment (e.g. Implementing Reg (EU) 2026/977)"
+      - "Post-market surveillance, vigilance, PSUR, SSCP obligations"
+      - "Cyber Resilience Act interplay for connected medical devices"
+      - "General Product Safety Regulation interface; RED for wireless medical devices"
+      - "CE marking under MDR/IVDR"
+
+  multimedia_services:
+    label: "Multimedia & media services (cross-cutting)"
+    owner: "Data Privacy"
+    frameworks:
+      - "Audiovisual Media Services Directive (AVMSD) (EU) 2018/1808 / Directive 2010/13/EU"
+      - "Ongoing AVMSD 2026 evaluation & review (call for evidence Nov 2025, consultation Feb 2026)"
+      - "Smart-TV / connected-TV interface prominence rules for media services"
+      - "AVMSD content accessibility (subtitling, audio description, sign language)"
+      - "European Accessibility Act (EAA) Directive (EU) 2019/882 (applicable June 2025)"
+      - "DSM Copyright Directive (EU) 2019/790 (bundled media/content services)"
+      - "Video-sharing platform (VSP) obligations and protection of minors"
+      - "DSA media-content prominence / gatekeeping interplay"
+      - "European Democracy Shield (media-sector measures)"
+
+  data_and_ai:
+    label: "Data privacy & AI (cross-cutting)"
+    owner: "Data Privacy"
+    frameworks:
+      - "GDPR and international data transfers"
+      - "AI Act (EU) 2024/1689 and delegated/implementing acts, codes of practice"
+      - "Data Act (EU) 2023/2854; Data Governance Act"
+      - "ePrivacy / cookies / electronic communications"
+      - "Digital Services Act (DSA) where platform features apply"
+      - "Digital Markets Act (DMA) where gatekeeper features apply"
+
+  product_security:
+    label: "Cybersecurity & product security (cross-cutting)"
+    owner: "Security"
+    frameworks:
+      - "Cyber Resilience Act (CRA) (EU) 2024/2847 - products with digital elements"
+      - "CRA vulnerability reporting and CSIRT obligations"
+      - "NIS2 Directive (EU) 2022/2555"
+      - "RED Article 3.3(d)(e)(f) cybersecurity (EN 18031-1/2/3)"
+      - "RED-to-CRA cybersecurity transition (overlap and repeal of RED 2022/30)"
+      - "EU Cybersecurity Act / ENISA certification schemes"
+
+# Fallback owner if an item matches no specific product line but is still relevant.
+default_owner: "Public Affairs"
+
+# --- Source toggles ---------------------------------------------------------
+sources:
+  cellar: true          # EUR-Lex published/adopted acts (CELLAR SPARQL)
+  have_your_say: true   # Commission consultations & calls for evidence (earliest stage)
+  oeil: true            # European Parliament Legislative Observatory (procedure tracking)
+
+# --- OEIL configuration -----------------------------------------------------
+oeil:
+  # MODE A (discover): paste an OEIL search RSS link (build a search on the OEIL
+  # site filtered to your subjects, copy its RSS link). Leave "" to disable.
+  search_rss: ""
+  # MODE B (watch): specific procedure references to follow stage-by-stage.
+  watch_references:
+    - "2023/0212(COD)"   # example - replace with files you track
+    # Tip: add live files for the electronic-displays ecodesign/labelling review,
+    # CRA implementing acts, ESPR delegated acts, AI Act secondary legislation.
+
+notify:
+  # One shared channel for everything (your chosen setup).
+  slack_webhook: ""    # https://hooks.slack.com/services/...
+  teams_webhook: ""    # https://outlook.office.com/webhook/...
